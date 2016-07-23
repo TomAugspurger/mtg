@@ -143,8 +143,14 @@ columns = ['sex', 'smoker', 'day', 'time']
 tips[columns] = tips[columns].apply(lambda x: x.astype('category'))
 ```
 
-
 We implement a `CategoricalTransformer`.
+This is to be used in a `Pipeline`.
+What features should our `Pipeline` support?
+
+- Infer columns to convert by dtype
+- Consistent set of transformed columns
+- Consistent ordering of the transformed columns
+
 
 ```python
 from itertools import chain

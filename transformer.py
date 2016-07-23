@@ -8,39 +8,19 @@ from sklearn.pipeline import TransformerMixin
 class CategoricalTransformer(TransformerMixin):
 
     def __init__(self, drop_first=False):
-        """
-        Dummy encode `Categorical` dtype columns.
-
-        Parameters
-        ----------
-        drop_first : bool
-            whether to drop the first category per column.
-
-        See Also
-        --------
-        pandas.get_dummies
-        """
         self.drop_first = drop_first
 
-    def fit(self, X, y=None, *args, **kwargs):
-        """
-        Parameters
-        ----------
-        X : DataFrame
-        y : array-like, optional
-
-        Returns
-        -------
-        self
-        """
+    def fit(self, X, y=None):
         self.columns_ = X.columns
         self.cat_columns_ = X.select_dtypes(include=['category']).columns
         self.non_cat_columns_ = X.columns.drop(self.cat_columns_)
 
-        self.cat_map_ = {col: X[col].cat.categories
-                         for col in self.cat_columns_}
-        self.ordered_ = {col: X[col].cat.ordered
-                         for col in self.cat_columns_}
+        self.cat_map_ = {
+            col: X[col].cat.categories for col in self.cat_columns_
+        }
+        self.ordered_ = {
+            col: X[col].cat.ordered for col in self.cat_columns_
+        }
 
         n = 1 if self.drop_first else 0
         self.dummy_columns_ = {col: ["{}_{}".format(col, v)
@@ -54,7 +34,7 @@ class CategoricalTransformer(TransformerMixin):
         )
         return self
 
-    def transform(self, X, y=None, *args, **kwargs):
+    def transform(self, X, y=None):
         return (pd.get_dummies(X, drop_first=self.drop_first)
                   .reindex(columns=self.transformed_columns_)
                   .fillna(0))
