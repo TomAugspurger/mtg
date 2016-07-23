@@ -43,7 +43,7 @@ class CategoricalTransformer(TransformerMixin):
                          for col in self.cat_columns_}
 
         n = 1 if self.drop_first else 0
-        self.dummy_columns_ = {col: ["_".join([col, v])
+        self.dummy_columns_ = {col: ["{}_{}".format(col, v)
                                for v in self.cat_map_[col][n:]]
                                for col in self.cat_columns_}
 
@@ -61,11 +61,12 @@ class CategoricalTransformer(TransformerMixin):
 
     def inverse_transform(self, X):
         X = np.asarray(X)
-        series = []
         non_cat_cols = (self.transformed_columns_
                             .get_indexer(self.non_cat_columns_))
         non_cat = pd.DataFrame(X[:, non_cat_cols],
                                columns=self.non_cat_columns_)
+
+        series = []
         for col, cat_cols in self.dummy_columns_.items():
             locs = self.transformed_columns_.get_indexer(cat_cols)
             codes = X[:, locs].argmax(1)

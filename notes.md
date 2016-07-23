@@ -44,7 +44,7 @@ y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \ldots + \beta_p x_p + \varepsilon
 $$
 
 
-Turns out we have an analytical solution for \boldsymbol{\hat{\beta}} the best estimator of \boldsymbol{\beta}:
+Turns out we have an analytical solution for $\boldsymbol{\hat{\beta}}$ the best estimator of $\boldsymbol{\beta}$:
 
 $$
 \hat{\boldsymbol{\beta}} = \left(\boldsymbol{X}^T\boldsymbol{X}\right)^{-1} \boldsymbol{X}^T \boldsymbol{y}
@@ -59,7 +59,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-tips = sns.load_dataset('tips')
+tips = pd.read_csv('tips.csv')
 tips.head()
 ```
 
@@ -88,6 +88,19 @@ If 'b' happened to come before 'a' on next time around, you're results would cha
 
 Second, it asserts that the difference between any two "adjacent" categories is the same.
 That is, the change in $y$ with respect to a jump from `'Thusrday'` to `'Friday'` has the same effect as a jump from `'Friday'` to `'Saturday'`.
+
+$$
+\frac{
+  \Delta{\text{tip}}
+}{
+  \Delta({\text{Thur.} \rightarrow \text{Fri.}})
+} = \frac{
+  \Delta{\text{tip}}
+}{
+  \Delta({\text{Fri.} \rightarrow \text{Sat.}})
+}
+$$
+
 Sometimes this may be true, but we have no reason to believe that here.
 
 2. Dummy-encoding
@@ -108,21 +121,28 @@ X, y = tips_dummies.drop("tip", axis=1), tips_dummies["tip"]
 lm = LinearRegression().fit(X, y)
 
 yhat = lm.predict(X)
-plt.scatter(y, y - yhat)
+fig, ax = plt.subplots()
+
+ax.scatter(y, y - yhat)
+ax.set(xlabel='tip', ylabel='residual', title='Dummy-Encoded Regression')
 ```
 
 ## `CategoricalTransformer`
 
-`Pipeline`s are great.
-Use them wherever possible.
-Convenient for grid searching.
-Quarantines test data from training.
-
 Our example above has a couple issues if we were going to "productionize" it.
 
 1. A bit difficult to go from dummy-encoded back to regular. Pandas doesn't have a `from_dummies` yet (PR anyone?)
-2. If working with a larger dataset and `partial_fit`, codes could be missing from subsets of the data. This *should* be OK, as long as you're careful to construct
-the DataFrame with all the categoricals. It'd be nice to have a sanity check though.
+2. If working with a larger dataset and `partial_fit`, codes could be missing from subsets of the data.
+3. Change in ordering: fixed from stats point of view, but need to ensure that the data always aligns.
+4. Potentially memory inefficient
+
+Let's convert the string columns to categoricals.
+
+```python
+columns = ['sex', 'smoker', 'day', 'time']
+tips[columns] = tips[columns].apply(lambda x: x.astype('category'))
+```
+
 
 We implement a `CategoricalTransformer`.
 
