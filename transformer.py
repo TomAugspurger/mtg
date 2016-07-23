@@ -8,7 +8,18 @@ from sklearn.pipeline import TransformerMixin
 class CategoricalTransformer(TransformerMixin):
 
     def __init__(self, drop_first=False):
-        # TODO
+        """
+        Dummy encode `Categorical` dtype columns.
+
+        Parameters
+        ----------
+        drop_first : bool
+            whether to drop the first category per column.
+
+        See Also
+        --------
+        pandas.get_dummies
+        """
         self.drop_first = drop_first
 
     def fit(self, X, y=None, *args, **kwargs):
@@ -31,9 +42,11 @@ class CategoricalTransformer(TransformerMixin):
         self.ordered_ = {col: X[col].cat.ordered
                          for col in self.cat_columns_}
 
+        n = 1 if self.drop_first else 0
         self.dummy_columns_ = {col: ["_".join([col, v])
-                                     for v in self.cat_map_[col]]
+                               for v in self.cat_map_[col][n:]]
                                for col in self.cat_columns_}
+
         self.transformed_columns_ = pd.Index(
             self.non_cat_columns_.tolist() +
             list(chain.from_iterable(self.dummy_columns_[k]
@@ -42,7 +55,7 @@ class CategoricalTransformer(TransformerMixin):
         return self
 
     def transform(self, X, y=None, *args, **kwargs):
-        return (pd.get_dummies(X)
+        return (pd.get_dummies(X, drop_first=self.drop_first)
                   .reindex(columns=self.transformed_columns_)
                   .fillna(0))
 
@@ -56,6 +69,9 @@ class CategoricalTransformer(TransformerMixin):
         for col, cat_cols in self.dummy_columns_.items():
             locs = self.transformed_columns_.get_indexer(cat_cols)
             codes = X[:, locs].argmax(1)
+            if self.drop_first:
+                codes += 1
+                codes[(X[:, locs] == 0).all(1)] = 0
             cats = pd.Categorical.from_codes(codes, self.cat_map_[col],
                                              ordered=self.ordered_[col])
             series.append(pd.Series(cats, name=col))

@@ -16,8 +16,11 @@ def data():
     )
     return df
 
-def test_smoke(data):
-    ct = CategoricalTransformer()
+@pytest.mark.parametrize('drop_first', [
+    True, False
+])
+def test_smoke(data, drop_first):
+    ct = CategoricalTransformer(drop_first=drop_first)
     ct = ct.fit(data)
     trn = ct.transform(data)
     result = ct.inverse_transform(trn)
