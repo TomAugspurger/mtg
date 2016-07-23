@@ -2,11 +2,6 @@
 title: "Bridging the pandas -- scikit-learn dtype divide"
 author: "Tom Augspurger"
 date: "2016-07-22"
-output:
-  pdf_document: default
-  word_document: default
-  html_document:
-    keep_md: yes
 ---
 
 Notes for my talk at PyData Chicago 2016
@@ -16,26 +11,35 @@ Notes for my talk at PyData Chicago 2016
 Pandas and scikit-learn have overlapping, but different data models.
 Both are based off NumPy arrays, but the extensions pandas has made to NumPy's type system have created a rift between the two. Most notably
 
-- Homogeneity
-  + NumPy arrays (and so scikit-learn feature matrices) are *homogeneous*, they must have a single dtype.
-  + Pandas DataFrames, can store *heterogeneous* data
+1. Homogeneity
+    - NumPy arrays (and so scikit-learn feature matrices) are *homogeneous*, they must have a single dtype.
+    - Pandas DataFrames, can store *heterogeneous* data
+2. Extension Types
+    - Pandas has implemented several extension dtypes, including `Categorical` and Datetime with TZ.
+
+"Real-world" data is often heterogeneous, making pandas the tool of choice.
+However, tools like Scikit-Learn, which do not depend on pandas, can't use its
+richer data structures.
+We need a way of bridging the gap between pandas' DataFrames and NumPy the arrays appropriate for scikit-learn.
 
 # Statistical Side
 
-Stepping back, let's thing about our goal.
-Suppose we have some data `X` (a NumPy array or DataFrame) and we want to predict `y`, a vector.
-To keep things extremely simple, we'll only focus on the linear regression case (OLS).
+Suppose we want to predict `tip` using all the other variables.
+To keep things extremely simple, we'll only focus on the linear regression case (OLS), though this approach is useful more generally.
 
 ```{python}
-X = pd.DataFrame({'A': ['a', 'a', 'b', 'a', 'b', 'b'],
-                  'B': [1, 2, 3, 3, 2, 4]})
-y = pd.Series([3, 4, 7, 5, 5, 8])
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+tips = sns.load_dataset('tips')
+tips.head()
 ```
 
 The equation we're estimating
 
 $$
-\boldsymbol{y} = \boldsymbol{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}
+\boldsymbol{y} = \boldsymbol{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon}
 $$
 
 
@@ -45,96 +49,73 @@ $$
 \hat{\boldsymbol{\beta}} = \left(\boldsymbol{X}^T\boldsymbol{X}\right)^{-1} \boldsymbol{X}^T \boldsymbol{y}
 $$
 
-But what is $X$ here? Typically our matrix multiplication has numeric values.
+But what is $X$ here? Typically matrix multiplication has numeric values.
+We need to convert the categorical data to numeric.
 Two approaches.
 
 1. Factorization: assign each original value a unique integer.
 
-```{python}
-codes, labels = pd.factorize(X['A'])
+```python
+codes, labels = pd.factorize(tips['day'])
 codes
 ```
 
 Let's try that
 
-```{python}
-X_factoriezed = X.copy()
-X['A'] = codes
+```python
+columns = ['sex', 'smoker', 'day', 'time']
+X_factorized = tips.copy()
+
+X_factorized[columns] = tips[columns].apply(lambda x: pd.factorize(x)[0])
+X_factorized.head()
 ```
 
+However, there are several problems with this approach.
+First, ordering becomes important.
+If 'b' happened to come before 'a' on next time around, you're results would change.
+
+Second, it asserts that the difference between any two "adjacent" categories is the same.
+That is, the change in $y$ with respect to a jump from `'Thusrday'` to `'Friday'` has the same effect as a jump from `'Friday'` to `'Saturday'`.
+Sometimes this may be true, but we have no reason to believe that here.
 
 2. Dummy-encoding
 
-This fixes some of the problems above.
+This fixes the problems above, and is the approach we'll use.
 
-```{python}
-dummies = pd.get_dummies(X)
-dummies
+```python
+tips_dummies = pd.get_dummies(tips, drop_first=True)
+tips_dummies.head()
 ```
 
+We can now fit the regression
 
-# NumPy
+```python
+from sklearn.linear_model import LinearRegression
 
-![dtype Hierarchy](figures/dtype-hierarchy.png)
+X, y = tips_dummies.drop("tip", axis=1), tips_dummies["tip"]
+lm = LinearRegression().fit(X, y)
 
-In practice this isn't such a big deal.
-In order to fit the model, we'll *usually* [^1: categorical trees?] need to convert everything to a numeric matrix.
-However, you don't want to irreparably lose the richer information of a categorical.
+yhat = lm.predict(X)
+plt.scatter(y, y - yhat)
+```
 
-# `CategoricalTransformer`
+## `CategoricalTransformer`
 
+`Pipeline`s are great.
+Use them wherever possible.
+Convenient for grid searching.
+Quarantines test data from training.
+
+Our example above has a couple issues if we were going to "productionize" it.
+
+1. A bit difficult to go from dummy-encoded back to regular. Pandas doesn't have a `from_dummies` yet (PR anyone?)
+2. If working with a larger dataset and `partial_fit`, codes could be missing from subsets of the data. This *should* be OK, as long as you're careful to construct
+the DataFrame with all the categoricals. It'd be nice to have a sanity check though.
 
 We implement a `CategoricalTransformer`.
 
-```{python}
-import numpy as np
-import pandas as pd
-from sklearn.pipeline import TransformerMixin
-
-
-class CategoricalTransformer(TransformerMixin):
-
-    def fit(self, X, y=None, *args, **kwargs):
-        self.columns_ = X.columns
-        self.cat_columns_ = X.select_dtypes(include=['category']).columns
-        self.non_cat_columns_ = X.columns.drop(self.cat_columns_)
-
-        self.cat_map_ = {col: X[col].cat.categories
-                         for col in self.cat_columns_}
-        self.ordered_ = {col: X[col].cat.ordered
-                         for col in self.cat_columns_}
-
-        self.dummy_columns_ = {col: ["_".join([col, v])
-                                     for v in self.cat_map_[col]]
-                               for col in self.cat_columns_}
-        self.transformed_columns_ = pd.Index(
-            self.non_cat_columns_.tolist() +
-            list(chain.from_iterable(self.dummy_columns_[k]
-                                     for k in self.cat_columns_))
-        )
-
-    def transform(self, X, y=None, *args, **kwargs):
-        return (pd.get_dummies(X)
-                  .reindex(columns=self.transformed_columns_)
-                  .fillna(0))
-
-    def inverse_transform(self, X):
-        X = np.asarray(X)
-        series = []
-        non_cat_cols = (self.transformed_columns_
-                            .get_indexer(self.non_cat_columns_))
-        non_cat = pd.DataFrame(X[:, non_cat_cols],
-                               columns=self.non_cat_columns_)
-        for col, cat_cols in self.dummy_columns_.items():
-            locs = self.transformed_columns_.get_indexer(cat_cols)
-            codes = X[:, locs].argmax(1)
-            cats = pd.Categorical.from_codes(codes, self.cat_map_[col],
-                                             ordered=self.ordered_[col])
-            series.append(pd.Series(cats, name=col))
-        # concats sorts, we want the original order
-        df = (pd.concat([non_cat] + series, axis=1)
-                .reindex(columns=self.columns_))
-        return df
+```python
+code
 ```
 
 
