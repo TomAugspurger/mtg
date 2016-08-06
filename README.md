@@ -1,14 +1,4 @@
 # Bridging the pandas – scikit-learn dtype divide
 
-Repository for my talk.
-
-Outline
-
-- Problem Statement
-- Two PoVs:
-  - statistical theory
-  - numerical / implementation
-- Background on dtypes
-- Investigate sklearn-pandas, pandas-ml
-- `CategoricalTransformer`
+Repository for my talk at [PyData Chicago 2016](http://pydata.org/chicago2016/schedule/presentation/2/).
 
