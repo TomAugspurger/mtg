@@ -84,7 +84,7 @@ tips_factorized.head()
 
 However, there are several problems with this approach.
 First, ordering becomes important.
-If 'b' happened to come before 'a' on next time around, you're results would change.
+If 'b' happened to come before 'a' on next time around, your results would change.
 
 Second, it asserts that the difference between any two "adjacent" categories is the same.
 That is, the change in $y$ with respect to a jump from `'Thusrday'` to `'Friday'` has the same effect as a jump from `'Friday'` to `'Saturday'`.
@@ -93,11 +93,11 @@ $$
 \frac{
   \Delta{\text{tip}}
 }{
-  \Delta({\text{Thur.} \rightarrow \text{Fri.}})
+  \Delta({\text{Sun.} \rightarrow \text{Sat.}})
 } = \frac{
   \Delta{\text{tip}}
 }{
-  \Delta({\text{Fri.} \rightarrow \text{Sat.}})
+  \Delta({\text{Thur.} \rightarrow \text{Fri.}})
 }
 $$
 
@@ -133,8 +133,7 @@ Our example above has a couple issues if we were going to "productionize" it.
 
 1. A bit difficult to go from dummy-encoded back to regular. Pandas doesn't have a `from_dummies` yet (PR anyone?)
 2. If working with a larger dataset and `partial_fit`, codes could be missing from subsets of the data.
-3. Change in ordering: fixed from stats point of view, but need to ensure that the data always aligns.
-4. Potentially memory inefficient
+3. Potentially memory inefficient
 
 Let's convert the string columns to categoricals.
 

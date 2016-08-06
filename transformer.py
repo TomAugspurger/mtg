@@ -11,20 +11,13 @@ class CategoricalTransformer(TransformerMixin):
         self.cat_columns_ = X.select_dtypes(include=['category']).columns
         self.non_cat_columns_ = X.columns.drop(self.cat_columns_)
 
-        self.cat_map_ = {
-            col: X[col].cat for col in self.cat_columns_
-        }
+        self.cat_map_ = {col: X[col].cat for col in self.cat_columns_}
 
-        trn = pd.get_dummies(X.head())
-
-        self.transformed_cols_ = trn.columns
         left = len(self.non_cat_columns_)
-
         self.cat_blocks_ = {}
         for col in self.cat_columns_:
             right = left + len(X[col].cat.categories)
-            self.cat_blocks_[col] = slice(left, right)
-            left = right
+            self.cat_blocks_[col], left = slice(left, right), right
         return self
 
     def transform(self, X, y=None):
@@ -32,7 +25,6 @@ class CategoricalTransformer(TransformerMixin):
 
     def inverse_transform(self, X):
         non_cat = pd.DataFrame(X[:, :len(self.non_cat_columns_)],
-                               index=self.index_,
                                columns=self.non_cat_columns_)
         cats = []
         for col, cat in self.cat_map_.items():
@@ -40,7 +32,7 @@ class CategoricalTransformer(TransformerMixin):
             codes = X[:, slice_].argmax(1)
             series = pd.Series(pd.Categorical.from_codes(
                 codes, cat.categories, ordered=cat.ordered
-            ), index=self.index_, name=col)
+            ), name=col)
             cats.append(series)
         df = pd.concat([non_cat] + cats, axis=1)[self.columns_]
         return df
