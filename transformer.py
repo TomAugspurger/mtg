@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.pipeline import TransformerMixin
 
 
-class CategoricalTransformer(TransformerMixin):
+class DummyEncoder(TransformerMixin):
 
     def fit(self, X, y=None):
         self.index_ = X.index
@@ -21,6 +21,7 @@ class CategoricalTransformer(TransformerMixin):
         return self
 
     def transform(self, X, y=None):
+        assert X.columns == self.columns_
         return np.asarray(pd.get_dummies(X))
 
     def inverse_transform(self, X):
