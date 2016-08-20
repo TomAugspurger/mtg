@@ -4,5 +4,6 @@ markdown.css
 *.key
 *.csv
 figures/
+*.png
 
 
