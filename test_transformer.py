@@ -2,7 +2,7 @@ import pytest
 
 import pandas as pd
 import pandas.util.testing as tm
-from transformer import CategoricalTransformer
+from transformer import DummyEncoder
 
 @pytest.fixture
 def data():
@@ -17,7 +17,7 @@ def data():
     return df
 
 def test_smoke(data):
-    ct = CategoricalTransformer()
+    ct = DummyEncoder()
     ct = ct.fit(data)
     trn = ct.transform(data)
     result = ct.inverse_transform(trn)
